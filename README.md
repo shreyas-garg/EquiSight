@@ -164,8 +164,3 @@ Results are saved to `evaluation_results_<timestamp>.json` and traced in LangSmi
 - Every recommendation includes a mandatory disclaimer
 - No price targets or guaranteed returns are generated
 
----
-
-## Team
-
-Built for the Multi-Agent Orchestration [AI/ML] capstone — evaluation June 25–30, 2026.
