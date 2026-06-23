@@ -1,5 +1,17 @@
 import yfinance as yf
 from typing import Any
+import numpy as np
+
+
+def _clean(value: Any) -> Any:
+    """Convert numpy scalars to native Python types for JSON/msgpack serialization."""
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return None if np.isnan(value) else float(value)
+    if isinstance(value, np.bool_):
+        return bool(value)
+    return value
 
 
 def get_company_info(ticker: str) -> dict[str, Any]:
@@ -7,7 +19,7 @@ def get_company_info(ticker: str) -> dict[str, Any]:
     stock = yf.Ticker(ticker)
     info = stock.info
 
-    return {
+    return {k: _clean(v) for k, v in {
         "company_name": info.get("longName", ticker),
         "sector": info.get("sector", "Unknown"),
         "industry": info.get("industry", "Unknown"),
@@ -17,7 +29,7 @@ def get_company_info(ticker: str) -> dict[str, Any]:
         "employees": info.get("fullTimeEmployees", 0),
         "country": info.get("country", ""),
         "currency": info.get("currency", "USD"),
-    }
+    }.items()}
 
 
 def get_financial_metrics(ticker: str) -> dict[str, Any]:
@@ -25,13 +37,14 @@ def get_financial_metrics(ticker: str) -> dict[str, Any]:
     stock = yf.Ticker(ticker)
     info = stock.info
 
-    # Fetch historical price data (1 year)
     hist = stock.history(period="1y")
     price_change_1y = 0.0
     if not hist.empty and len(hist) >= 2:
-        price_change_1y = ((hist["Close"].iloc[-1] - hist["Close"].iloc[0]) / hist["Close"].iloc[0]) * 100
+        price_change_1y = float(
+            (hist["Close"].iloc[-1] - hist["Close"].iloc[0]) / hist["Close"].iloc[0] * 100
+        )
 
-    return {
+    return {k: _clean(v) for k, v in {
         "current_price": info.get("currentPrice") or info.get("regularMarketPrice", 0),
         "pe_ratio": info.get("trailingPE", None),
         "forward_pe": info.get("forwardPE", None),
@@ -54,4 +67,4 @@ def get_financial_metrics(ticker: str) -> dict[str, Any]:
         "price_change_1y_pct": round(price_change_1y, 2),
         "analyst_target_price": info.get("targetMeanPrice", None),
         "recommendation_key": info.get("recommendationKey", ""),
-    }
+    }.items()}
