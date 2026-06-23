@@ -49,7 +49,7 @@ def run_risk_analysis(state: ResearchState) -> dict:
     }
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-1.5-flash",
         google_api_key=os.environ["GOOGLE_API_KEY"],
         temperature=0.1,
     )

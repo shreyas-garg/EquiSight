@@ -34,7 +34,7 @@ def run_financial_analysis(state: ResearchState) -> dict:
     raw_metrics = get_financial_metrics(ticker)
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-1.5-flash",
         google_api_key=os.environ["GOOGLE_API_KEY"],
         temperature=0.1,
     )

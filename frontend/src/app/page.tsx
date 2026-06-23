@@ -63,8 +63,8 @@ export default function HomePage() {
     setCurrentStep(0);
 
     const stepInterval = setInterval(() => {
-      setCurrentStep((s) => Math.min(s + 1, AGENT_STEPS.length - 1));
-    }, 4500);
+      setCurrentStep((s) => (s < AGENT_STEPS.length - 1 ? s + 1 : s));
+    }, 8000);
 
     try {
       const research = await startResearch(t);
@@ -218,7 +218,11 @@ export default function HomePage() {
                   <Brain className="w-7 h-7 text-white animate-pulse" />
                 </div>
                 <h2 className="text-xl font-bold text-white mb-1">Analyzing {appState.ticker}</h2>
-                <p className="text-sm text-white/40">Multi-agent pipeline running…</p>
+                <p className="text-sm text-white/40">
+                {currentStep >= AGENT_STEPS.length - 1
+                  ? "Synthesizing final decision… (this may take up to 90s)"
+                  : "Multi-agent pipeline running…"}
+              </p>
               </div>
 
               <div className="space-y-2.5">
