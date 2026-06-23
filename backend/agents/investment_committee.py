@@ -81,7 +81,7 @@ def run_investment_committee(state: ResearchState) -> dict:
     }
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite",
         google_api_key=os.environ["GOOGLE_API_KEY"],
         temperature=0.2,
     )

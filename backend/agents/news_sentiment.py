@@ -44,7 +44,7 @@ def run_news_sentiment(state: ResearchState) -> dict:
         articles_text = f"No recent news articles found for {company_name}."
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash-lite",
         google_api_key=os.environ["GOOGLE_API_KEY"],
         temperature=0.1,
     )
