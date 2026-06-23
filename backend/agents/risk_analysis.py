@@ -1,40 +1,27 @@
 import json
-import os
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.graph.state import ResearchState
+from backend.agents._llm import invoke_llm
 
 
-SYSTEM_PROMPT = """You are a risk management specialist for an equity research firm.
-Your task is to assess the investment risk profile of a company based on financial data,
-news sentiment, and market context.
-
-Risk scoring guidance:
-- risk_score (0-100): 0-33 = low risk, 34-66 = medium risk, 67-100 = high risk
-- risk_level: "low" (score 0-33), "medium" (score 34-66), "high" (score 67-100)
-- Consider: financial leverage (D/E ratio), earnings volatility (beta), competitive risks,
-  regulatory risks, macro risks, liquidity risks, management risks, sector-specific risks
-
-Always respond with valid JSON matching this exact schema:
+SYSTEM_PROMPT = """You are a risk management specialist. Assess investment risk based on financial data and news.
+risk_score 0-100: 0-33 low, 34-66 medium, 67-100 high.
+Always respond with valid JSON:
 {
   "risk_level": "low" | "medium" | "high",
-  "risk_score": number (0-100),
+  "risk_score": number,
   "risks": ["string", ...],
-  "risk_summary": "string (2-3 sentences summarizing the overall risk profile)"
+  "risk_summary": "string"
 }
-
-Provide 4-6 specific, material risk factors.
-"""
+Provide 4-6 specific risk factors."""
 
 
 def run_risk_analysis(state: ResearchState) -> dict:
-    """Synthesize financial and news data to assess risk using the LLM."""
     ticker = state.ticker
     company_name = state.company_data.get("company_name", ticker)
 
     context = {
-        "ticker": ticker,
-        "company_name": company_name,
+        "ticker": ticker, "company_name": company_name,
         "sector": state.company_data.get("sector", "Unknown"),
         "financial_score": state.financial_data.get("financial_score", 50),
         "financial_weaknesses": state.financial_data.get("weaknesses", []),
@@ -48,25 +35,12 @@ def run_risk_analysis(state: ResearchState) -> dict:
         "price_change_1y": state.financial_data.get("raw_metrics", {}).get("price_change_1y_pct"),
     }
 
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite",
-        google_api_key=os.environ["GOOGLE_API_KEY"],
-        temperature=0.1,
-    )
-
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(
-            content=(
-                f"Perform a comprehensive risk assessment for {company_name} ({ticker}) "
-                f"using this synthesized data:\n\n{json.dumps(context, indent=2)}"
-            )
-        ),
+        HumanMessage(content=f"Risk assessment for {company_name} ({ticker}):\n\n{json.dumps(context, indent=2)}"),
     ]
 
-    response = llm.invoke(messages)
-    content = response.content.strip()
-
+    content = invoke_llm(messages)
     if content.startswith("```"):
         content = content.split("```")[1]
         if content.startswith("json"):
@@ -75,20 +49,9 @@ def run_risk_analysis(state: ResearchState) -> dict:
 
     try:
         risk_data = json.loads(content)
-        # Ensure risk_level matches risk_score
         score = risk_data.get("risk_score", 50)
-        if score <= 33:
-            risk_data["risk_level"] = "low"
-        elif score <= 66:
-            risk_data["risk_level"] = "medium"
-        else:
-            risk_data["risk_level"] = "high"
+        risk_data["risk_level"] = "low" if score <= 33 else "high" if score > 66 else "medium"
     except json.JSONDecodeError:
-        risk_data = {
-            "risk_level": "medium",
-            "risk_score": 50,
-            "risks": ["Unable to parse detailed risk analysis"],
-            "risk_summary": "Risk analysis could not be fully parsed.",
-        }
+        risk_data = {"risk_level": "medium", "risk_score": 50, "risks": [], "risk_summary": ""}
 
     return {"risk_data": risk_data}
