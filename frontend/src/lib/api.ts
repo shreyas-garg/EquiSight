@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE = "http://localhost:8000/api";
 
 export interface ResearchResponse {
   run_id: string;
