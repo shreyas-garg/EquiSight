@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import {
   startResearch, approveResearch, getStatus, getReportUrl,
   type ResearchResponse, type StatusResponse,
@@ -237,11 +239,58 @@ function AgentCard({ step, index, done, active }: {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function HomePage() {
+function HomePageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [ticker, setTicker] = useState("");
   const [appState, setAppState] = useState<AppState>({ phase: "idle" });
   const [currentStep, setCurrentStep] = useState(0);
   const [expandedAgent, setExpandedAgent] = useState<number | null>(null);
+
+  // Restore state from URL on mount / back-navigation
+  useEffect(() => {
+    const t = searchParams.get("ticker");
+    const run = searchParams.get("run");
+    const done = searchParams.get("done");
+
+    if (!t) { setAppState({ phase: "idle" }); setTicker(""); return; }
+
+    setTicker(t);
+
+    if (run && done) {
+      setAppState({ phase: "done", runId: run });
+    } else if (run) {
+      // Try sessionStorage cache first (avoids refetch on back-nav)
+      try {
+        const cached = sessionStorage.getItem(`review-${run}`);
+        if (cached) {
+          const { data, status } = JSON.parse(cached);
+          setAppState({ phase: "review", data, status });
+          return;
+        }
+      } catch {}
+      // Fallback: reconstruct from status endpoint
+      fetch(`http://localhost:8000/api/status/${run}`)
+        .then(r => r.json())
+        .then(status => {
+          const data: ResearchResponse = {
+            run_id: run,
+            status: "pending_approval",
+            ticker: t,
+            recommendation: status.recommendation ?? {},
+            company_name: status.company_name ?? t,
+            risk_level: status.risk_data?.risk_level ?? "",
+            risk_score: status.risk_data?.risk_score ?? 0,
+            financial_score: status.financial_data?.financial_score ?? 0,
+            sentiment: status.news_data?.sentiment ?? "",
+            requires_approval: true,
+          };
+          setAppState({ phase: "review", data, status });
+        }).catch(() => router.replace("/"));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,33 +298,38 @@ export default function HomePage() {
     if (!t) return;
     setAppState({ phase: "loading", ticker: t });
     setCurrentStep(0);
+    router.push(`/?ticker=${t}`);
     const iv = setInterval(() => setCurrentStep(s => s < AGENT_STEPS.length - 1 ? s + 1 : s), 8000);
     try {
       const research = await startResearch(t);
       clearInterval(iv);
       setCurrentStep(AGENT_STEPS.length);
       const status = await getStatus(research.run_id);
+      try { sessionStorage.setItem(`review-${research.run_id}`, JSON.stringify({ data: research, status })); } catch {}
+      router.push(`/?ticker=${t}&run=${research.run_id}`, { scroll: false });
       setAppState({ phase: "review", data: research, status });
     } catch (err) {
       clearInterval(iv);
       setAppState({ phase: "error", message: err instanceof Error ? err.message : "Research failed" });
+      router.replace("/");
     }
   };
 
   const handleApprove = async (approved: boolean) => {
     if (appState.phase !== "review") return;
     const runId = appState.data.run_id;
-    if (!approved) { setAppState({ phase: "idle" }); setTicker(""); return; }
+    if (!approved) { router.push("/"); return; }
     setAppState({ phase: "generating" });
     try {
       await approveResearch(runId, true);
+      router.push(`/?ticker=${ticker}&run=${runId}&done=1`, { scroll: false });
       setAppState({ phase: "done", runId });
     } catch (err) {
       setAppState({ phase: "error", message: err instanceof Error ? err.message : "Report generation failed" });
     }
   };
 
-  const reset = () => { setAppState({ phase: "idle" }); setTicker(""); setCurrentStep(0); };
+  const reset = () => { router.push("/"); };
 
   const rec = appState.phase === "review" ? appState.data.recommendation.recommendation : null;
   const recMeta = {
@@ -699,5 +753,13 @@ export default function HomePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense>
+      <HomePageInner />
+    </Suspense>
   );
 }
