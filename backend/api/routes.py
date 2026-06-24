@@ -188,6 +188,23 @@ async def get_report(run_id: str) -> FileResponse:
     )
 
 
+@router.get("/prices/{ticker}")
+async def get_prices(ticker: str) -> dict:
+    """Return 30-day daily close prices for a ticker (for sparkline charts)."""
+    import yfinance as yf
+    try:
+        hist = yf.Ticker(ticker.upper()).history(period="30d", interval="1d")
+        if hist.empty:
+            raise HTTPException(status_code=404, detail="No price data found")
+        closes = [round(float(v), 2) for v in hist["Close"].tolist()]
+        change_pct = round((closes[-1] - closes[0]) / closes[0] * 100, 2) if len(closes) >= 2 else 0.0
+        return {"ticker": ticker.upper(), "closes": closes, "change_pct": change_pct}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/status/{run_id}")
 async def get_status(run_id: str) -> dict:
     """Get the current status and summary of a research run."""
