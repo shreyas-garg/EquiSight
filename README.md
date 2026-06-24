@@ -6,7 +6,6 @@
 
 A production-quality **multi-agent AI system** that conducts comprehensive stock research — analyzing fundamentals, financials, news sentiment, and risk — then surfaces a committee-grade **BUY / HOLD / SELL** decision with full reasoning and a downloadable PDF report.
 
-Built as a capstone project for the **Multi-Agent Orchestration [AI/ML]** course.
 
 ![Stack](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-blue?style=flat-square)
 ![Stack](https://img.shields.io/badge/Orchestration-LangGraph-orange?style=flat-square)
@@ -35,25 +34,34 @@ A human must **approve the decision** before a PDF report is generated — enfor
 ## Pipeline Architecture
 
 ```
-                        ┌─────────────────────────────────┐
-                        │         LangGraph Pipeline       │
-                        └─────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│              LangGraph Pipeline                  │
+└──────────────────────────────────────────────────┘
 
-  [Company Research] ──► [Financial Analysis] ──► [News Sentiment] ──► [Risk Assessment]
-                                                                               │
-                                                              ┌────────────────┴────────────────┐
-                                                         risk_score > 75               risk_score ≤ 75
-                                                              │                                  │
-                                                     [High Risk Review]                          │
-                                                              └────────────────┬────────────────┘
-                                                                               │
-                                                                  [Investment Committee]
-                                                                               │
-                                                                   ◉ INTERRUPT — HITL Gate
-                                                                               │
-                                                                    Human Approves / Rejects
-                                                                               │
-                                                                        [PDF Report]
+[1] Company Research
+        │
+        ▼
+[2] Financial Analysis
+        │
+        ▼
+[3] News Sentiment
+        │
+        ▼
+[4] Risk Assessment
+        │
+        ├── risk_score > 75 ──► [4b] High Risk Review ──┐
+        │                                                │
+        └── risk_score ≤ 75 ──────────────────────────── ┘
+                                                         │
+                                                         ▼
+                                            [5] Investment Committee
+                                                         │
+                                               ◉ HITL Interrupt
+                                                         │
+                                            Human Approves / Rejects
+                                                         │
+                                                         ▼
+                                                  [PDF Report]
 ```
 
 **Conditional routing** — if `risk_score > 75`, the pipeline automatically routes through a High Risk Review node before the final committee vote.
