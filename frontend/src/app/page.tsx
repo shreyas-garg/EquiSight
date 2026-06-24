@@ -172,7 +172,7 @@ function TickerTape() {
         { proName: "NASDAQ:AAPL" }, { proName: "NASDAQ:MSFT" },
         { proName: "NASDAQ:NVDA" }, { proName: "NASDAQ:TSLA" },
         { proName: "NASDAQ:AMZN" }, { proName: "NASDAQ:GOOGL" },
-        { proName: "NASDAQ:META" }, { proName: "NYSE:RKLB" },
+        { proName: "NASDAQ:META" }, { proName: "NASDAQ:ASML" },
       ],
       showSymbolLogo: true, isTransparent: true,
       displayMode: "adaptive", colorTheme: "dark", locale: "en",
