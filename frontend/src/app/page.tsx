@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   startResearch,
   approveResearch,
@@ -9,26 +9,11 @@ import {
   type ResearchResponse,
   type StatusResponse,
 } from "@/lib/api";
-import { cn, getSentimentColor } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  FileText,
-  Search,
-  Activity,
-  BarChart2,
-  Newspaper,
-  Shield,
-  Users,
-  Download,
-  ArrowRight,
-  Sparkles,
-  ChevronRight,
-  Brain,
+  TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle,
+  XCircle, FileText, Search, BarChart2, Newspaper, Shield,
+  Users, Download, ChevronRight, Activity, Terminal,
 } from "lucide-react";
 
 type AppState =
@@ -40,479 +25,490 @@ type AppState =
   | { phase: "error"; message: string };
 
 const AGENT_STEPS = [
-  { id: "company_research", label: "Company Research", desc: "Profile & fundamentals", icon: Search },
-  { id: "financial_analysis", label: "Financial Analysis", desc: "Scoring metrics", icon: BarChart2 },
-  { id: "news_sentiment", label: "News Sentiment", desc: "Market signals", icon: Newspaper },
-  { id: "risk_analysis", label: "Risk Assessment", desc: "Risk profiling", icon: Shield },
-  { id: "investment_committee", label: "Committee Decision", desc: "BUY / HOLD / SELL", icon: Users },
+  { id: "company_research", label: "COMPANY RESEARCH", icon: Search },
+  { id: "financial_analysis", label: "FINANCIAL ANALYSIS", icon: BarChart2 },
+  { id: "news_sentiment", label: "NEWS SENTIMENT", icon: Newspaper },
+  { id: "risk_analysis", label: "RISK ASSESSMENT", icon: Shield },
+  { id: "investment_committee", label: "COMMITTEE DECISION", icon: Users },
 ];
 
-const POPULAR_TICKERS = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN"];
+const TICKERS = ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL", "META", "SPCX", "RKLB"];
+
+// TradingView chart widget
+function TradingViewChart({ ticker }: { ticker: string }) {
+  useEffect(() => {
+    const container = document.getElementById("tv-chart-container");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const script = document.createElement("script");
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      autosize: true,
+      symbol: ticker,
+      interval: "D",
+      timezone: "Etc/UTC",
+      theme: "dark",
+      style: "1",
+      locale: "en",
+      backgroundColor: "rgba(0, 0, 0, 0)",
+      gridColor: "rgba(255, 255, 255, 0.04)",
+      hide_top_toolbar: false,
+      hide_legend: false,
+      save_image: false,
+      calendar: false,
+      hide_volume: false,
+    });
+    container.appendChild(script);
+  }, [ticker]);
+
+  return (
+    <div className="tradingview-widget-container h-full" style={{ height: "100%" }}>
+      <div id="tv-chart-container" style={{ height: "100%", width: "100%" }} />
+    </div>
+  );
+}
+
+// Ticker tape
+function TickerTape() {
+  useEffect(() => {
+    const container = document.getElementById("ticker-tape");
+    if (!container || container.childElementCount > 0) return;
+
+    const script = document.createElement("script");
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      symbols: [
+        { proName: "NASDAQ:AAPL", title: "Apple" },
+        { proName: "NASDAQ:MSFT", title: "Microsoft" },
+        { proName: "NASDAQ:NVDA", title: "NVIDIA" },
+        { proName: "NASDAQ:TSLA", title: "Tesla" },
+        { proName: "NASDAQ:AMZN", title: "Amazon" },
+        { proName: "NASDAQ:GOOGL", title: "Google" },
+        { proName: "NASDAQ:META", title: "Meta" },
+        { proName: "NYSE:RKLB", title: "Rocket Lab" },
+      ],
+      showSymbolLogo: true,
+      isTransparent: true,
+      displayMode: "adaptive",
+      colorTheme: "dark",
+      locale: "en",
+    });
+    container.appendChild(script);
+  }, []);
+
+  return (
+    <div className="tradingview-widget-container border-b border-[#1a2a1a]" style={{ height: "46px" }}>
+      <div id="ticker-tape" />
+    </div>
+  );
+}
 
 export default function HomePage() {
   const [ticker, setTicker] = useState("");
   const [appState, setAppState] = useState<AppState>({ phase: "idle" });
   const [currentStep, setCurrentStep] = useState(0);
+  const [time, setTime] = useState("");
+
+  useEffect(() => {
+    const update = () => setTime(new Date().toLocaleTimeString("en-US", { hour12: false }));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const t = ticker.trim().toUpperCase();
     if (!t) return;
-
     setAppState({ phase: "loading", ticker: t });
     setCurrentStep(0);
 
-    const stepInterval = setInterval(() => {
-      setCurrentStep((s) => (s < AGENT_STEPS.length - 1 ? s + 1 : s));
-    }, 8000);
-
+    const iv = setInterval(() => setCurrentStep(s => s < AGENT_STEPS.length - 1 ? s + 1 : s), 8000);
     try {
       const research = await startResearch(t);
-      clearInterval(stepInterval);
+      clearInterval(iv);
       setCurrentStep(AGENT_STEPS.length);
       const status = await getStatus(research.run_id);
       setAppState({ phase: "review", data: research, status });
     } catch (err) {
-      clearInterval(stepInterval);
-      setAppState({
-        phase: "error",
-        message: err instanceof Error ? err.message : "Research failed",
-      });
+      clearInterval(iv);
+      setAppState({ phase: "error", message: err instanceof Error ? err.message : "Research failed" });
     }
   };
 
   const handleApprove = async (approved: boolean) => {
     if (appState.phase !== "review") return;
     const runId = appState.data.run_id;
-
-    if (!approved) {
-      setAppState({ phase: "idle" });
-      setTicker("");
-      return;
-    }
-
+    if (!approved) { setAppState({ phase: "idle" }); setTicker(""); return; }
     setAppState({ phase: "generating" });
     try {
       await approveResearch(runId, true);
       setAppState({ phase: "done", runId });
     } catch (err) {
-      setAppState({
-        phase: "error",
-        message: err instanceof Error ? err.message : "Report generation failed",
-      });
+      setAppState({ phase: "error", message: err instanceof Error ? err.message : "Report generation failed" });
     }
   };
 
-  const resetApp = () => {
-    setAppState({ phase: "idle" });
-    setTicker("");
-    setCurrentStep(0);
-  };
+  const reset = () => { setAppState({ phase: "idle" }); setTicker(""); setCurrentStep(0); };
+
+  const rec = appState.phase === "review" ? appState.data.recommendation.recommendation : null;
+  const recColor = rec === "BUY" ? "#00ff41" : rec === "SELL" ? "#ff3b3b" : "#ffd700";
 
   return (
-    <div className="min-h-screen bg-[#0a0f1e] text-white">
-      {/* Nav */}
-      <nav className="border-b border-white/5 backdrop-blur-sm sticky top-0 z-50 bg-[#0a0f1e]/80">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-sm tracking-tight">EquiSight</span>
+    <div className="min-h-screen bg-[#0a0a0a] text-[#d4d4d4] font-mono flex flex-col">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 py-1.5 bg-[#0d1a0d] border-b border-[#1a3a1a] text-[11px]">
+        <div className="flex items-center gap-4">
+          <span className="text-[#00ff41] font-bold tracking-widest">EQUISIGHT</span>
+          <span className="text-[#444]">|</span>
+          <span className="text-[#888]">AI EQUITY RESEARCH TERMINAL</span>
+        </div>
+        <div className="flex items-center gap-4 text-[#555]">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00ff41] animate-pulse" />
+            <span className="text-[#00ff41]">LIVE</span>
+          </span>
+          <span>{time} EST</span>
+          <span>5 AGENTS ACTIVE</span>
+          <span>GEMINI 2.5</span>
+        </div>
+      </div>
+
+      {/* Ticker tape */}
+      <TickerTape />
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left sidebar */}
+        <div className="w-52 flex-shrink-0 border-r border-[#1a2a1a] bg-[#080808] flex flex-col">
+          <div className="px-3 py-2 border-b border-[#1a2a1a] text-[10px] text-[#555] tracking-widest">WATCHLIST</div>
+          <div className="flex-1 overflow-y-auto">
+            {TICKERS.map(t => (
+              <button
+                key={t}
+                onClick={() => setTicker(t)}
+                className={cn(
+                  "w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-[#0d1a0d] border-b border-[#111] transition-colors",
+                  ticker === t ? "bg-[#0d1a0d] text-[#00ff41]" : "text-[#888]"
+                )}
+              >
+                <span className="font-bold">{t}</span>
+                <ChevronRight className="w-3 h-3 opacity-30" />
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-white/40">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>5 agents · Gemini 2.5 Flash · LangGraph</span>
+
+          {/* Agent pipeline */}
+          <div className="border-t border-[#1a2a1a]">
+            <div className="px-3 py-2 text-[10px] text-[#555] tracking-widest">AGENT PIPELINE</div>
+            {AGENT_STEPS.map((step, i) => {
+              const done = appState.phase === "review" || appState.phase === "done" || (appState.phase === "loading" && i < currentStep);
+              const active = appState.phase === "loading" && i === currentStep;
+              return (
+                <div key={step.id} className={cn(
+                  "px-3 py-1.5 flex items-center gap-2 text-[10px] border-b border-[#0f0f0f]",
+                  done ? "text-[#00ff41]" : active ? "text-[#ffd700]" : "text-[#333]"
+                )}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0",
+                    done ? "bg-[#00ff41]" : active ? "bg-[#ffd700] animate-pulse" : "bg-[#222]"
+                  )} />
+                  {step.label}
+                </div>
+              );
+            })}
           </div>
         </div>
-      </nav>
 
-      <main className="max-w-6xl mx-auto px-6">
+        {/* Main content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* ── IDLE / ERROR ─────────────────────────────────────────── */}
-        {(appState.phase === "idle" || appState.phase === "error") && (
-          <div className="animate-fade-in">
-            {/* Hero */}
-            <div className="pt-24 pb-16 text-center">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-8">
-                <Sparkles className="w-3.5 h-3.5" />
-                Multi-Agent AI · Human-in-the-Loop
-              </div>
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-5 bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent leading-tight">
-                Institutional-grade<br />equity research, instant.
-              </h1>
-              <p className="text-white/50 text-lg max-w-lg mx-auto mb-12 leading-relaxed">
-                Five specialized AI agents analyze any stock across fundamentals, financials, sentiment, and risk — then surface a BUY / HOLD / SELL decision.
-              </p>
-
-              {/* Search box */}
-              <form onSubmit={handleSubmit} className="max-w-md mx-auto">
-                <div className="relative flex items-center">
-                  <Search className="absolute left-4 w-4 h-4 text-white/30 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={ticker}
-                    onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                    placeholder="Enter ticker symbol…"
-                    maxLength={10}
-                    className="w-full pl-11 pr-36 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder:text-white/25 focus:outline-none focus:border-blue-500/50 focus:bg-white/8 transition-all text-sm font-mono tracking-wider"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!ticker.trim()}
-                    className="absolute right-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 disabled:from-white/10 disabled:to-white/10 disabled:text-white/30 text-white rounded-xl text-sm font-medium transition-all flex items-center gap-1.5"
-                  >
-                    Analyze <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </form>
-
-              {/* Quick picks */}
-              <div className="flex items-center justify-center gap-2 mt-4">
-                <span className="text-xs text-white/25">Try:</span>
-                {POPULAR_TICKERS.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => { setTicker(t); }}
-                    className="px-3 py-1 text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-white/50 hover:text-white/80 rounded-lg transition-all font-mono"
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-
-              {appState.phase === "error" && (
-                <div className="mt-6 max-w-md mx-auto p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400 flex items-start gap-2.5">
-                  <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>{appState.message}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Agent pipeline cards */}
-            <div className="grid grid-cols-5 gap-3 pb-20">
-              {AGENT_STEPS.map((step, i) => (
-                <div key={step.id} className="relative group">
-                  <div className="p-4 rounded-xl bg-white/3 border border-white/8 hover:border-white/15 hover:bg-white/6 transition-all text-center">
-                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-violet-500/20 border border-white/10 flex items-center justify-center mx-auto mb-3">
-                      <step.icon className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <p className="text-xs font-semibold text-white/80 mb-1">{step.label}</p>
-                    <p className="text-xs text-white/30">{step.desc}</p>
-                  </div>
-                  {i < AGENT_STEPS.length - 1 && (
-                    <ChevronRight className="absolute -right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20 z-10" />
-                  )}
-                </div>
-              ))}
-            </div>
+          {/* Search bar */}
+          <div className="border-b border-[#1a2a1a] bg-[#080808] px-4 py-2 flex items-center gap-3">
+            <Terminal className="w-4 h-4 text-[#00ff41]" />
+            <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-3">
+              <span className="text-[#00ff41] text-sm">{">"}</span>
+              <input
+                type="text"
+                value={ticker}
+                onChange={e => setTicker(e.target.value.toUpperCase())}
+                placeholder="ENTER TICKER SYMBOL (e.g. AAPL)"
+                maxLength={10}
+                className="flex-1 bg-transparent text-[#00ff41] placeholder:text-[#2a4a2a] outline-none text-sm tracking-widest"
+              />
+              <button
+                type="submit"
+                disabled={!ticker.trim() || appState.phase === "loading"}
+                className="px-4 py-1 border border-[#00ff41] text-[#00ff41] text-xs tracking-widest hover:bg-[#00ff41] hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              >
+                {appState.phase === "loading" ? "ANALYZING..." : "RUN ANALYSIS"}
+              </button>
+            </form>
+            {(appState.phase === "review" || appState.phase === "done" || appState.phase === "error") && (
+              <button onClick={reset} className="text-[10px] text-[#555] hover:text-[#888] tracking-widest">CLR</button>
+            )}
           </div>
-        )}
 
-        {/* ── LOADING ──────────────────────────────────────────────── */}
-        {appState.phase === "loading" && (
-          <div className="animate-fade-in min-h-[80vh] flex flex-col items-center justify-center">
-            <div className="w-full max-w-sm">
-              <div className="text-center mb-10">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center mx-auto mb-5">
-                  <Brain className="w-7 h-7 text-white animate-pulse" />
+          {/* Content area */}
+          <div className="flex-1 overflow-y-auto">
+
+            {/* IDLE */}
+            {(appState.phase === "idle" || appState.phase === "error") && (
+              <div className="flex flex-col items-center justify-center h-full gap-8 p-8">
+                <div className="text-center">
+                  <div className="text-[#00ff41] text-5xl font-bold tracking-widest mb-2">EQUISIGHT</div>
+                  <div className="text-[#444] text-sm tracking-widest">AI-POWERED MULTI-AGENT EQUITY RESEARCH TERMINAL</div>
+                  <div className="text-[#2a2a2a] text-xs mt-2 tracking-widest">LANGGRAPH · GEMINI 2.5 · HUMAN-IN-THE-LOOP</div>
                 </div>
-                <h2 className="text-xl font-bold text-white mb-1">Analyzing {appState.ticker}</h2>
-                <p className="text-sm text-white/40">
-                {currentStep >= AGENT_STEPS.length - 1
-                  ? "Synthesizing final decision… (this may take up to 90s)"
-                  : "Multi-agent pipeline running…"}
-              </p>
-              </div>
 
-              <div className="space-y-2.5">
+                <div className="grid grid-cols-5 gap-px bg-[#1a2a1a] border border-[#1a2a1a] w-full max-w-3xl">
+                  {AGENT_STEPS.map((step, i) => (
+                    <div key={step.id} className="bg-[#080808] p-4 text-center">
+                      <step.icon className="w-5 h-5 text-[#00ff41] mx-auto mb-2" />
+                      <div className="text-[9px] text-[#555] tracking-widest">{step.label}</div>
+                      <div className="text-[#222] text-[9px] mt-1">AGENT {i + 1}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="text-[#2a2a2a] text-xs tracking-widest animate-pulse">
+                  ENTER TICKER SYMBOL ABOVE TO BEGIN ANALYSIS
+                </div>
+
+                {appState.phase === "error" && (
+                  <div className="border border-[#ff3b3b] bg-[#1a0000] px-4 py-3 text-[#ff3b3b] text-xs tracking-wide max-w-lg text-center">
+                    ERROR: {appState.message}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* LOADING */}
+            {appState.phase === "loading" && (
+              <div className="p-6 space-y-1">
+                <div className="text-[#00ff41] text-xs tracking-widest mb-4">
+                  INITIALIZING ANALYSIS FOR <span className="font-bold">{appState.ticker}</span>...
+                </div>
                 {AGENT_STEPS.map((step, i) => {
                   const done = i < currentStep;
                   const active = i === currentStep;
                   return (
-                    <div
-                      key={step.id}
-                      className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-500",
-                        done ? "bg-emerald-500/10 border-emerald-500/25"
-                          : active ? "bg-blue-500/10 border-blue-500/30"
-                          : "bg-white/3 border-white/6 opacity-40"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
-                        done ? "bg-emerald-500/20" : active ? "bg-blue-500/20" : "bg-white/5"
+                    <div key={step.id} className="flex items-center gap-3 py-1.5 border-b border-[#0f0f0f] text-xs">
+                      <span className={cn("w-2 h-2 rounded-full",
+                        done ? "bg-[#00ff41]" : active ? "bg-[#ffd700] animate-pulse" : "bg-[#1a1a1a]"
+                      )} />
+                      <span className={cn("tracking-widest w-48",
+                        done ? "text-[#00ff41]" : active ? "text-[#ffd700]" : "text-[#333]"
+                      )}>{step.label}</span>
+                      <span className={cn("text-[10px]",
+                        done ? "text-[#00aa2a]" : active ? "text-[#aa8800]" : "text-[#222]"
                       )}>
-                        {done
-                          ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                          : <step.icon className={cn("w-3.5 h-3.5", active ? "text-blue-400" : "text-white/20")} />
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-xs font-medium truncate", done ? "text-emerald-300" : active ? "text-blue-300" : "text-white/30")}>
-                          {step.label}
-                        </p>
-                      </div>
-                      {active && (
-                        <div className="flex gap-0.5">
-                          {[0, 1, 2].map((d) => (
-                            <span key={d} className="w-1 h-1 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: `${d * 150}ms` }} />
-                          ))}
-                        </div>
-                      )}
-                      {done && <span className="text-xs text-emerald-500">Done</span>}
+                        {done ? "[ COMPLETE ]" : active ? (
+                          <span className="animate-pulse">
+                            {i === AGENT_STEPS.length - 1 ? "[ PROCESSING... MAY TAKE UP TO 90s ]" : "[ PROCESSING... ]"}
+                          </span>
+                        ) : "[ QUEUED ]"}
+                      </span>
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── REVIEW ───────────────────────────────────────────────── */}
-        {appState.phase === "review" && (
-          <div className="animate-fade-in py-10">
-            {/* Top bar */}
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 font-medium">Analysis Complete</span>
-                  {appState.status.risk_data.high_risk_review_triggered && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/25 font-medium flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> High Risk Review
-                    </span>
-                  )}
+                <div className="pt-4 text-[#333] text-[10px] tracking-widest">
+                  MULTI-AGENT PIPELINE RUNNING · DO NOT INTERRUPT
                 </div>
-                <h2 className="text-2xl font-bold text-white">
-                  {appState.status.company_name || appState.data.ticker}
-                  <span className="text-white/30 ml-2 text-lg font-normal">{appState.data.ticker}</span>
-                </h2>
               </div>
-              <button onClick={resetApp} className="text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2">
-                New search
-              </button>
-            </div>
+            )}
 
-            {/* Recommendation hero */}
-            <div className={cn(
-              "rounded-2xl border p-6 mb-6",
-              appState.data.recommendation.recommendation === "BUY"
-                ? "bg-emerald-500/8 border-emerald-500/20"
-                : appState.data.recommendation.recommendation === "SELL"
-                ? "bg-red-500/8 border-red-500/20"
-                : "bg-amber-500/8 border-amber-500/20"
-            )}>
-              <div className="flex items-start gap-6">
-                <div className={cn(
-                  "w-20 h-20 rounded-2xl flex flex-col items-center justify-center flex-shrink-0",
-                  appState.data.recommendation.recommendation === "BUY" ? "bg-emerald-500/20"
-                  : appState.data.recommendation.recommendation === "SELL" ? "bg-red-500/20"
-                  : "bg-amber-500/20"
-                )}>
-                  {appState.data.recommendation.recommendation === "BUY"
-                    ? <TrendingUp className="w-8 h-8 text-emerald-400" />
-                    : appState.data.recommendation.recommendation === "SELL"
-                    ? <TrendingDown className="w-8 h-8 text-red-400" />
-                    : <Minus className="w-8 h-8 text-amber-400" />
-                  }
-                  <span className={cn(
-                    "text-xs font-bold mt-1",
-                    appState.data.recommendation.recommendation === "BUY" ? "text-emerald-400"
-                    : appState.data.recommendation.recommendation === "SELL" ? "text-red-400"
-                    : "text-amber-400"
-                  )}>
-                    {appState.data.recommendation.recommendation}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-white/60 leading-relaxed mb-4">
-                    {appState.data.recommendation.reasoning}
-                  </p>
-                  {(appState.data.recommendation.key_drivers ?? []).length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {appState.data.recommendation.key_drivers!.map((d, i) => (
-                        <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/50">
-                          {d}
-                        </span>
+            {/* REVIEW */}
+            {appState.phase === "review" && (
+              <div className="flex h-full">
+                {/* Left: data */}
+                <div className="flex-1 overflow-y-auto">
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-[#1a2a1a] flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-bold text-white">{appState.data.ticker}</span>
+                        <span className="text-[#888] text-sm">{appState.status.company_name}</span>
+                        {appState.status.risk_data.high_risk_review_triggered && (
+                          <span className="text-[10px] px-2 py-0.5 border border-[#ff3b3b] text-[#ff3b3b] tracking-widest">⚠ HIGH RISK REVIEW</span>
+                        )}
+                      </div>
+                      <div className="text-[#555] text-[10px] tracking-widest mt-0.5">
+                        {appState.status.status?.company_name || "ANALYSIS COMPLETE"} · AWAITING HUMAN APPROVAL
+                      </div>
+                    </div>
+                    <div className={cn("text-3xl font-bold tracking-widest")} style={{ color: recColor }}>
+                      {rec}
+                    </div>
+                  </div>
+
+                  {/* Metrics row */}
+                  <div className="grid grid-cols-4 border-b border-[#1a2a1a]">
+                    {[
+                      { label: "RECOMMENDATION", value: rec || "—", color: recColor },
+                      { label: "CONFIDENCE", value: `${appState.data.recommendation.confidence}%`, color: "#fff" },
+                      { label: "FINANCIAL SCORE", value: `${appState.data.financial_score}/100`, color: appState.data.financial_score >= 70 ? "#00ff41" : appState.data.financial_score >= 40 ? "#ffd700" : "#ff3b3b" },
+                      { label: "RISK SCORE", value: `${appState.data.risk_score}/100`, color: appState.data.risk_score <= 33 ? "#00ff41" : appState.data.risk_score <= 66 ? "#ffd700" : "#ff3b3b" },
+                    ].map((m, i) => (
+                      <div key={i} className="px-4 py-3 border-r border-[#1a2a1a] last:border-r-0">
+                        <div className="text-[9px] text-[#555] tracking-widest mb-1">{m.label}</div>
+                        <div className="text-xl font-bold" style={{ color: m.color }}>{m.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Second metrics row */}
+                  <div className="grid grid-cols-3 border-b border-[#1a2a1a]">
+                    {[
+                      { label: "SENTIMENT", value: (appState.data.sentiment || "neutral").toUpperCase(), color: appState.data.sentiment === "positive" ? "#00ff41" : appState.data.sentiment === "negative" ? "#ff3b3b" : "#ffd700" },
+                      { label: "RISK LEVEL", value: (appState.data.risk_level || "—").toUpperCase(), color: appState.data.risk_level === "low" ? "#00ff41" : appState.data.risk_level === "high" ? "#ff3b3b" : "#ffd700" },
+                      { label: "SECTOR", value: appState.status.financial_data?.strengths?.[0] ? "SEE BELOW" : (appState.status.company_name ? "—" : "—"), color: "#888" },
+                    ].map((m, i) => (
+                      <div key={i} className="px-4 py-2 border-r border-[#1a2a1a] last:border-r-0">
+                        <div className="text-[9px] text-[#555] tracking-widest mb-1">{m.label}</div>
+                        <div className="text-sm font-bold" style={{ color: m.color }}>{m.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 divide-x divide-[#1a2a1a]">
+                    {/* Reasoning */}
+                    <div className="p-4 border-b border-[#1a2a1a]">
+                      <div className="text-[9px] text-[#555] tracking-widest mb-2">COMMITTEE REASONING</div>
+                      <p className="text-xs text-[#aaa] leading-relaxed">{appState.data.recommendation.reasoning}</p>
+                      {(appState.data.recommendation.key_drivers ?? []).length > 0 && (
+                        <div className="mt-3">
+                          <div className="text-[9px] text-[#555] tracking-widest mb-1.5">KEY DRIVERS</div>
+                          {appState.data.recommendation.key_drivers!.map((d, i) => (
+                            <div key={i} className="flex gap-2 text-[11px] text-[#888] mb-1">
+                              <span className="text-[#00ff41]">+</span>{d}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Risks */}
+                    <div className="p-4 border-b border-[#1a2a1a]">
+                      <div className="text-[9px] text-[#555] tracking-widest mb-2">RISK FACTORS</div>
+                      {(appState.status.risk_data.risks ?? []).slice(0, 5).map((r, i) => (
+                        <div key={i} className="flex gap-2 text-[11px] text-[#888] mb-1.5">
+                          <span className="text-[#ff3b3b]">!</span>{r}
+                        </div>
+                      ))}
+                      {(appState.data.recommendation.risks_to_thesis ?? []).length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-[9px] text-[#555] tracking-widest mb-1.5">RISKS TO THESIS</div>
+                          {appState.data.recommendation.risks_to_thesis!.map((r, i) => (
+                            <div key={i} className="flex gap-2 text-[11px] text-[#888] mb-1">
+                              <span className="text-[#ffd700]">▲</span>{r}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Strengths */}
+                    <div className="p-4">
+                      <div className="text-[9px] text-[#555] tracking-widest mb-2">FINANCIAL STRENGTHS</div>
+                      {(appState.status.financial_data.strengths ?? []).map((s, i) => (
+                        <div key={i} className="flex gap-2 text-[11px] text-[#888] mb-1.5">
+                          <span className="text-[#00ff41]">✓</span>{s}
+                        </div>
                       ))}
                     </div>
-                  )}
-                </div>
-                <div className="flex-shrink-0 text-right">
-                  <p className="text-3xl font-bold text-white">{appState.data.recommendation.confidence}%</p>
-                  <p className="text-xs text-white/30 mt-0.5">confidence</p>
-                </div>
-              </div>
-            </div>
 
-            {/* Metric row */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <ScoreCard
-                label="Financial Score"
-                score={appState.data.financial_score}
-                icon={<BarChart2 className="w-4 h-4" />}
-                color={appState.data.financial_score >= 70 ? "emerald" : appState.data.financial_score >= 40 ? "amber" : "red"}
-              />
-              <ScoreCard
-                label="Risk Score"
-                score={appState.data.risk_score}
-                icon={<Shield className="w-4 h-4" />}
-                color={appState.data.risk_score <= 33 ? "emerald" : appState.data.risk_score <= 66 ? "amber" : "red"}
-                invert
-              />
-              <div className="rounded-xl bg-white/3 border border-white/8 p-4">
-                <div className="flex items-center gap-2 text-white/40 text-xs mb-3">
-                  <Newspaper className="w-4 h-4" />
-                  News Sentiment
-                </div>
-                <p className={cn("text-xl font-bold capitalize", getSentimentColor(appState.data.sentiment))}>
-                  {appState.data.sentiment || "Neutral"}
-                </p>
-                {appState.status.news_data.key_news?.slice(0, 2).map((n, i) => (
-                  <p key={i} className="text-xs text-white/30 mt-2 leading-snug line-clamp-2">• {n}</p>
-                ))}
-              </div>
-            </div>
-
-            {/* Strengths / Risks */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="rounded-xl bg-white/3 border border-white/8 p-4">
-                <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Strengths</p>
-                <ul className="space-y-2">
-                  {(appState.status.financial_data.strengths ?? []).slice(0, 4).map((s, i) => (
-                    <li key={i} className="flex gap-2 text-xs text-white/60">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-xl bg-white/3 border border-white/8 p-4">
-                <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">Risk Factors</p>
-                <ul className="space-y-2">
-                  {(appState.status.risk_data.risks ?? []).slice(0, 4).map((r, i) => (
-                    <li key={i} className="flex gap-2 text-xs text-white/60">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                      {r}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* HITL approval */}
-            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-6">
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
-                      <Users className="w-3.5 h-3.5 text-blue-400" />
+                    {/* News */}
+                    <div className="p-4">
+                      <div className="text-[9px] text-[#555] tracking-widest mb-2">NEWS HEADLINES</div>
+                      {(appState.status.news_data.key_news ?? []).slice(0, 5).map((n, i) => (
+                        <div key={i} className="flex gap-2 text-[11px] text-[#888] mb-1.5">
+                          <span className="text-[#555]">›</span>{n}
+                        </div>
+                      ))}
                     </div>
-                    <h3 className="text-sm font-semibold text-white">Human-in-the-Loop Approval</h3>
                   </div>
-                  <p className="text-xs text-white/40 leading-relaxed max-w-lg">
-                    {appState.data.recommendation.disclaimer}
-                  </p>
+
+                  {/* HITL */}
+                  <div className="border-t border-[#1a3a1a] bg-[#080808] px-4 py-3 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-[10px] text-[#555] tracking-widest mb-0.5">HUMAN-IN-THE-LOOP APPROVAL REQUIRED</div>
+                      <div className="text-[10px] text-[#333]">{appState.data.recommendation.disclaimer}</div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button onClick={() => handleApprove(false)} className="px-4 py-2 border border-[#ff3b3b] text-[#ff3b3b] text-xs tracking-widest hover:bg-[#ff3b3b] hover:text-black transition-all flex items-center gap-1.5">
+                        <XCircle className="w-3.5 h-3.5" /> REJECT
+                      </button>
+                      <button onClick={() => handleApprove(true)} className="px-4 py-2 border border-[#00ff41] text-[#00ff41] text-xs tracking-widest hover:bg-[#00ff41] hover:text-black transition-all flex items-center gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5" /> APPROVE & GENERATE PDF
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => handleApprove(false)}
-                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white text-xs font-medium transition-all flex items-center gap-1.5"
-                  >
-                    <XCircle className="w-3.5 h-3.5" /> Reject
-                  </button>
-                  <button
-                    onClick={() => handleApprove(true)}
-                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white text-xs font-medium transition-all flex items-center gap-1.5"
-                  >
-                    <FileText className="w-3.5 h-3.5" /> Approve & Generate PDF
+
+                {/* Right: chart */}
+                <div className="w-[480px] flex-shrink-0 border-l border-[#1a2a1a] flex flex-col">
+                  <div className="px-3 py-2 border-b border-[#1a2a1a] text-[10px] text-[#555] tracking-widest flex items-center gap-2">
+                    <Activity className="w-3 h-3 text-[#00ff41]" />
+                    LIVE CHART · {appState.data.ticker}
+                  </div>
+                  <div className="flex-1">
+                    <TradingViewChart ticker={appState.data.ticker} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* GENERATING */}
+            {appState.phase === "generating" && (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <FileText className="w-10 h-10 text-[#00ff41] animate-pulse" />
+                <div className="text-[#00ff41] tracking-widest">GENERATING PDF REPORT...</div>
+                <div className="text-[#333] text-xs tracking-widest">COMPILING RESEARCH DATA</div>
+              </div>
+            )}
+
+            {/* DONE */}
+            {appState.phase === "done" && (
+              <div className="flex flex-col items-center justify-center h-full gap-6">
+                <CheckCircle className="w-12 h-12 text-[#00ff41]" />
+                <div>
+                  <div className="text-[#00ff41] tracking-widest text-center mb-1">REPORT GENERATED SUCCESSFULLY</div>
+                  <div className="text-[#444] text-xs tracking-widest text-center">EQUITY RESEARCH PDF READY FOR DOWNLOAD</div>
+                </div>
+                <div className="flex gap-3">
+                  <a href={getReportUrl(appState.runId)} target="_blank" rel="noopener noreferrer"
+                    className="px-6 py-2.5 border border-[#00ff41] text-[#00ff41] text-xs tracking-widest hover:bg-[#00ff41] hover:text-black transition-all flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5" /> DOWNLOAD PDF
+                  </a>
+                  <button onClick={reset} className="px-6 py-2.5 border border-[#444] text-[#444] text-xs tracking-widest hover:border-[#888] hover:text-[#888] transition-all">
+                    NEW ANALYSIS
                   </button>
                 </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
-
-        {/* ── GENERATING ───────────────────────────────────────────── */}
-        {appState.phase === "generating" && (
-          <div className="animate-fade-in min-h-[80vh] flex flex-col items-center justify-center gap-5 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center">
-              <FileText className="w-8 h-8 text-white animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white mb-2">Generating PDF Report</h2>
-              <p className="text-sm text-white/40">Compiling research into a professional equity report…</p>
-            </div>
-            <div className="flex gap-1.5">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── DONE ─────────────────────────────────────────────────── */}
-        {appState.phase === "done" && (
-          <div className="animate-fade-in min-h-[80vh] flex flex-col items-center justify-center gap-6 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Report Ready</h2>
-              <p className="text-sm text-white/40">Your equity research PDF has been generated.</p>
-            </div>
-            <div className="flex gap-3">
-              <a
-                href={getReportUrl(appState.runId)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white text-sm font-medium transition-all flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" /> Download PDF
-              </a>
-              <button
-                onClick={resetApp}
-                className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white text-sm font-medium transition-all"
-              >
-                Analyze Another
-              </button>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
-
-function ScoreCard({
-  label,
-  score,
-  icon,
-  color,
-  invert = false,
-}: {
-  label: string;
-  score: number;
-  icon: React.ReactNode;
-  color: "emerald" | "amber" | "red";
-  invert?: boolean;
-}) {
-  const colorMap = {
-    emerald: { text: "text-emerald-400", bar: "bg-emerald-500" },
-    amber: { text: "text-amber-400", bar: "bg-amber-500" },
-    red: { text: "text-red-400", bar: "bg-red-500" },
-  };
-  const c = colorMap[color];
-
-  return (
-    <div className="rounded-xl bg-white/3 border border-white/8 p-4">
-      <div className="flex items-center gap-2 text-white/40 text-xs mb-3">
-        {icon}
-        {label}
+        </div>
       </div>
-      <p className={cn("text-3xl font-bold mb-3", c.text)}>{score}<span className="text-sm text-white/30 font-normal">/100</span></p>
-      <div className="h-1.5 rounded-full bg-white/5">
-        <div className={cn("h-full rounded-full transition-all", c.bar)} style={{ width: `${score}%` }} />
+
+      {/* Status bar */}
+      <div className="flex items-center justify-between px-4 py-1 bg-[#0d1a0d] border-t border-[#1a3a1a] text-[10px] text-[#444]">
+        <div className="flex items-center gap-4">
+          <span className="text-[#00ff41]">●</span>
+          <span>SYSTEM READY</span>
+          <span>·</span>
+          <span>LANGGRAPH v0.2</span>
+          <span>·</span>
+          <span>FASTAPI BACKEND</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <span>TAVILY SEARCH</span>
+          <span>·</span>
+          <span>LANGSMITH TRACING</span>
+          <span>·</span>
+          <span>REPORTLAB PDF</span>
+        </div>
       </div>
     </div>
   );
