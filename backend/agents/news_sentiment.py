@@ -1,4 +1,5 @@
 import json
+from langsmith import traceable
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.tools.news_tool import get_recent_news
 from backend.graph.state import ResearchState
@@ -16,6 +17,7 @@ Always respond with valid JSON:
 Provide 3-6 key news summaries."""
 
 
+@traceable(name="3. News Sentiment Agent", run_type="chain")
 def run_news_sentiment(state: ResearchState) -> dict:
     ticker = state.ticker
     company_name = state.company_data.get("company_name", ticker)

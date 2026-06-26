@@ -1,4 +1,5 @@
 import json
+from langsmith import traceable
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.graph.state import ResearchState
 from backend.agents._llm import invoke_llm
@@ -27,6 +28,7 @@ DISCLAIMER = (
 GUARDRAIL_PATTERNS = ["guarantee", "guaranteed", "will definitely", "certain to", "promise", "risk-free", "no risk"]
 
 
+@traceable(name="5. Investment Committee Agent", run_type="chain")
 def run_investment_committee(state: ResearchState) -> dict:
     ticker = state.ticker
     company_name = state.company_data.get("company_name", ticker)

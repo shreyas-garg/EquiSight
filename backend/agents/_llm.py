@@ -2,6 +2,7 @@
 import os
 import re
 import time
+from langsmith import traceable
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import BaseMessage
 
@@ -21,6 +22,7 @@ def _is_retryable(error: Exception) -> bool:
     return any(code in msg for code in ["429", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE"])
 
 
+@traceable(name="Gemini LLM Call", run_type="llm")
 def invoke_llm(messages: list[BaseMessage], temperature: float = 0.1) -> str:
     """Invoke Gemini with automatic retry and model fallback."""
     api_key = os.environ["GOOGLE_API_KEY"]

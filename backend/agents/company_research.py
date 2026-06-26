@@ -1,4 +1,5 @@
 import json
+from langsmith import traceable
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.tools.finance_tool import get_company_info
 from backend.graph.state import ResearchState
@@ -21,6 +22,7 @@ Always respond with valid JSON matching this exact schema:
 }"""
 
 
+@traceable(name="1. Company Research Agent", run_type="chain")
 def run_company_research(state: ResearchState) -> dict:
     ticker = state.ticker
     raw_data = get_company_info(ticker)

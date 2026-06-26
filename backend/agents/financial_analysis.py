@@ -1,4 +1,5 @@
 import json
+from langsmith import traceable
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.tools.finance_tool import get_financial_metrics
 from backend.graph.state import ResearchState
@@ -17,6 +18,7 @@ Always respond with valid JSON:
 Provide 3-5 specific, data-driven strengths and weaknesses."""
 
 
+@traceable(name="2. Financial Analysis Agent", run_type="chain")
 def run_financial_analysis(state: ResearchState) -> dict:
     ticker = state.ticker
     company_name = state.company_data.get("company_name", ticker)

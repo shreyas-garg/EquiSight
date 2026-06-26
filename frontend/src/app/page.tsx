@@ -368,7 +368,7 @@ function HomePageInner() {
           <div className="px-3 pt-3 pb-2">
             <p className="text-[10px] text-white/25 uppercase tracking-widest mb-2">Watchlist</p>
             {QUICK_TICKERS.map(t => (
-              <button key={t} onClick={() => setTicker(t)}
+              <button key={t} type="button" onClick={() => setTicker(t)}
                 className={cn(
                   "w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between mb-0.5 transition-colors",
                   ticker === t ? "bg-blue-600/20 text-blue-400" : "text-white/50 hover:text-white hover:bg-white/5"
@@ -425,7 +425,7 @@ function HomePageInner() {
               <div className="flex items-center gap-1.5 mt-2">
                 <span className="text-xs text-white/25">Quick pick:</span>
                 {QUICK_TICKERS.slice(0, 6).map(t => (
-                  <button key={t} onClick={() => setTicker(t)}
+                  <button key={t} type="button" onClick={() => setTicker(t)}
                     className="px-2 py-0.5 text-xs bg-white/5 hover:bg-white/10 border border-white/8 text-white/40 hover:text-white/70 rounded transition-colors font-mono">
                     {t}
                   </button>

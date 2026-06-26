@@ -1,4 +1,5 @@
 import json
+from langsmith import traceable
 from langchain_core.messages import HumanMessage, SystemMessage
 from backend.graph.state import ResearchState
 from backend.agents._llm import invoke_llm
@@ -16,6 +17,7 @@ Always respond with valid JSON:
 Provide 4-6 specific risk factors."""
 
 
+@traceable(name="4. Risk Analysis Agent", run_type="chain")
 def run_risk_analysis(state: ResearchState) -> dict:
     ticker = state.ticker
     company_name = state.company_data.get("company_name", ticker)
