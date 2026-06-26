@@ -31,6 +31,31 @@ A human must **approve the decision** before a PDF report is generated — enfor
 
 ---
 
+## Screenshots
+
+### Landing Page
+Clean search interface with live market sparklines pulling real 30-day price data.
+
+![Landing page](screenshots/01-landing.png)
+
+### Multi-Agent Pipeline in Action
+Watch all five agents execute step-by-step in real time.
+
+![Pipeline running](screenshots/02-pipeline.png)
+
+### Analysis & Human Approval
+BUY / HOLD / SELL verdict with financial, risk, and sentiment scores, committee reasoning, a live TradingView chart, and the human-in-the-loop approval gate. (Note the **High Risk Review** badge — triggered automatically because the risk score exceeded 75.)
+
+![Analysis review](screenshots/03-analysis.png)
+
+### Generated PDF Report
+A professional equity research report compiled by ReportLab.
+
+![PDF report page 1](screenshots/04-report-page1.png)
+![PDF report page 2](screenshots/05-report-page2.png)
+
+---
+
 ## Pipeline Architecture
 
 ```
